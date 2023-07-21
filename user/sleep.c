@@ -3,7 +3,7 @@
 
 int main(int argc, char const *argv[])
 {
-  if (argc != 2) { //参数错误
+  if (argc != 2) { //参数出错
     fprintf(2, "usage: sleep <time>\n");
     exit(1);
   }
