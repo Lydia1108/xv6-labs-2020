@@ -150,6 +150,8 @@ freeproc(struct proc *p)
   p->killed = 0;
   p->xstate = 0;
   p->state = UNUSED;
+  // 防止产生记忆现象，重置一下
+  p->trace_mask = 0;
 }
 
 // Create a user page table for a given process,
@@ -288,6 +290,9 @@ fork(void)
     if(p->ofile[i])
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
+
+  //将trace_mask拷贝到子进程
+  np->trace_mask = p->trace_mask;
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
@@ -691,5 +696,16 @@ procdump(void)
       state = "???";
     printf("%d %s %s", p->pid, state, p->name);
     printf("\n");
+  }
+}
+
+// 获取进程数，和获取内存类似，传入info.nproc的引用，然后链表动一次就加一次
+void
+procnum(uint64 *dest) {
+  *dest = 0;
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++) {
+    if(p->state != UNUSED) 
+      (*dest)++;
   }
 }
