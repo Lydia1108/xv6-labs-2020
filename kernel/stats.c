@@ -66,4 +66,3 @@ statsinit(void)
   devsw[STATS].read = statsread;
   devsw[STATS].write = statswrite;
 }
-

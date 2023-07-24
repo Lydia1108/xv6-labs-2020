@@ -43,6 +43,51 @@ static struct disk {
   } info[NUM];
   
   struct spinlock vdisk_lock;
+  //
+// driver for qemu's virtio disk device.
+// uses qemu's mmio interface to virtio.
+// qemu presents a "legacy" virtio interface.
+//
+// qemu ... -drive file=fs.img,if=none,format=raw,id=x0 -device virtio-blk-device,drive=x0,bus=virtio-mmio-bus.0
+//
+
+#include "types.h"
+#include "riscv.h"
+#include "defs.h"
+#include "param.h"
+#include "memlayout.h"
+#include "spinlock.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "buf.h"
+#include "virtio.h"
+
+// the address of virtio mmio register r.
+#define R(r) ((volatile uint32 *)(VIRTIO0 + (r)))
+
+static struct disk {
+ // memory for virtio descriptors &c for queue 0.
+ // this is a global instead of allocated because it must
+ // be multiple contiguous pages, which kalloc()
+ // doesn't support, and page aligned.
+  char pages[2*PGSIZE];
+  struct VRingDesc *desc;
+  uint16 *avail;
+  struct UsedArea *used;
+
+  // our own book-keeping.
+  char free[NUM];  // is a descriptor free?
+  uint16 used_idx; // we've looked this far in used[2..NUM].
+
+  // track info about in-flight operations,
+  // for use when completion interrupt arrives.
+  // indexed by first descriptor index of chain.
+  struct {
+    struct buf *b;
+    char status;
+  } info[NUM];
+  
+  struct spinlock vdisk_lock;
   
 } __attribute__ ((aligned (PGSIZE))) disk;
 
