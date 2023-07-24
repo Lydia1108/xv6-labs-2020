@@ -232,4 +232,3 @@ log_write(struct buf *b)
   }
   release(&log.lock);
 }
-
