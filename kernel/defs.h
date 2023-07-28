@@ -209,7 +209,7 @@ void            virtio_disk_intr(void);
 // int             copyin(pagetable_t, char *, uint64, uint64);
 // int             copyinstr(pagetable_t, char *, uint64, uint64);
 void            vmprint(pagetable_t);
-
+void            vmprintIn(pagetable_t pagetable, int level);
 // stats.c
 void            statsinit(void);
 void            statsinc(void);
