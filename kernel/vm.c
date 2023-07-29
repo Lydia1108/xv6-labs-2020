@@ -299,9 +299,6 @@ uvmfree(pagetable_t pagetable, uint64 sz)
   freewalk(pagetable);
 }
 
-
-
-
 // Given a parent process's page table, copy
 // its memory into a child's page table.
 // Copies both the page table and the
@@ -309,7 +306,7 @@ uvmfree(pagetable_t pagetable, uint64 sz)
 // returns 0 on success, -1 on failure.
 // frees any allocated pages on failure.
 int
-uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)//已修改，使其作用改为“标记cow页面”
+uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
 {
   pte_t *pte;
   uint64 pa, i;
@@ -339,7 +336,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)//已修改，使其作用�
       goto err;
     }
     // 调用引用计数加1
-    increfcnt(pa);  //////increfcnt定义在kalloc.c中
+    increfcnt(pa);
   }
   return 0;
 
@@ -371,7 +368,7 @@ copyout(pagetable_t pagetable, uint64 dstva, char *src, uint64 len)
 
   while(len > 0){
     va0 = PGROUNDDOWN(dstva);
-    ///// 将walkaddr换为walkcowaddr.walkcowaddr定义在trap.c中
+    // 将walkaddr换为walkcowaddr
     pa0 = walkcowaddr(pagetable, va0);
     if(pa0 == 0)
       return -1;
