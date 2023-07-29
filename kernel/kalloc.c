@@ -37,6 +37,30 @@ kinit()
   freerange(end, (void*)PHYSTOP);
 }
 
+// 增加引用计数
+void increfcnt(uint64 pa) {
+  if (pa < KERNBASE) {
+    return;
+  }
+  pa = (pa - KERNBASE) >> 12;
+  acquire(&cows[pa].lock);
+  ++cows[pa].ref_cnt;
+  release(&cows[pa].lock);
+}
+
+// 减少引用计数
+uint8 decrefcnt(uint64 pa) {
+  uint8 ret;
+  if (pa < KERNBASE) {
+    return 0;
+  }
+  pa = (pa - KERNBASE) >> 12;
+  acquire(&cows[pa].lock);
+  ret = --cows[pa].ref_cnt;
+  release(&cows[pa].lock);
+  return ret;
+}
+
 void
 freerange(void *pa_start, void *pa_end)
 {
@@ -99,26 +123,3 @@ kalloc(void)
   return (void*)r;
 }
 
-// 增加引用计数
-void increfcnt(uint64 pa) {
-  if (pa < KERNBASE) {
-    return;
-  }
-  pa = (pa - KERNBASE) >> 12;
-  acquire(&cows[pa].lock);
-  ++cows[pa].ref_cnt;
-  release(&cows[pa].lock);
-}
-
-// 减少引用计数
-uint8 decrefcnt(uint64 pa) {
-  uint8 ret;
-  if (pa < KERNBASE) {
-    return 0;
-  }
-  pa = (pa - KERNBASE) >> 12;
-  acquire(&cows[pa].lock);
-  ret = --cows[pa].ref_cnt;
-  release(&cows[pa].lock);
-  return ret;
-}
