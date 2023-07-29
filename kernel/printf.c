@@ -121,7 +121,7 @@ panic(char *s)
   printf("panic: ");
   printf(s);
   printf("\n");
-  //添加backtrace调用
+  //在panic中添加backtrace调用
   backtrace();
   panicked = 1; // freeze uart output from other CPUs
   for(;;)
@@ -135,7 +135,7 @@ printfinit(void)
   pr.locking = 1;
 }
 
-// 实现的backtrace函数，打印程序地址
+// 实现backtrace函数，打印程序地址
 void
 backtrace(void) {
   printf("backtrace:\n");
