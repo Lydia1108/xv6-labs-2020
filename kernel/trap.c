@@ -34,7 +34,7 @@ trapinithart(void)
 // called from trampoline.S
 //
 void
-usertrap(void)
+usertrap(void)//usertrap已修改
 {
   int which_dev = 0;
 
@@ -76,6 +76,20 @@ usertrap(void)
   if(p->killed)
     exit(-1);
 
+  // 产生了计时器中断
+  if(which_dev == 2){
+    //具有时钟中断处理函数
+    if(p->ticks!=0){
+      ++p->curticks;
+      if(p->curticks==p->ticks){
+        // p->trapframe->epc=p->handler;
+        // p->curticks=0;
+        //保存现场
+        memmove(&(p->resume), p->trapframe, sizeof(struct trapframe));
+        p->trapframe->epc = p->handler;
+      }
+    }
+  }
   // give up the CPU if this is a timer interrupt.
   if(which_dev == 2)
     yield();
@@ -217,4 +231,3 @@ devintr()
     return 0;
   }
 }
-
