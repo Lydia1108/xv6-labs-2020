@@ -46,7 +46,7 @@ void put(int key, int value)//lab7中的修改：在put函数中使用锁
 
   // is the key already present?
   struct entry *e = 0;
-  pthread_mutex_lock(&lock[i]); // lab7中修改：获取锁
+
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key)
       break;
@@ -56,7 +56,7 @@ void put(int key, int value)//lab7中的修改：在put函数中使用锁
     e->value = value;
   } else {
     // 加锁
-    //pthread_mutex_lock(&locks[i]);
+    pthread_mutex_lock(&locks[i]);
     // the new is new.
     insert(key, value, &table[i], table[i]);
     // 释放锁
