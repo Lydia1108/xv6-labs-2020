@@ -5,7 +5,8 @@
 #include <pthread.h>
 #include <sys/time.h>
 
-#define NBUCKET 5
+// 修改 NBUCKET 避免并发写入内存重叠
+#define NBUCKET 7
 #define NKEYS 100000
 
 struct entry {
@@ -16,6 +17,9 @@ struct entry {
 struct entry *table[NBUCKET];
 int keys[NKEYS];
 int nthread = 1;
+
+// lab7中的修改：定义一组互斥锁
+pthread_mutex_t locks[NBUCKET];
 
 double
 now()
@@ -36,12 +40,13 @@ insert(int key, int value, struct entry **p, struct entry *n)
 }
 
 static 
-void put(int key, int value)
+void put(int key, int value)//lab7中的修改：在put函数中使用锁
 {
   int i = key % NBUCKET;
 
   // is the key already present?
   struct entry *e = 0;
+  pthread_mutex_lock(&lock[i]); // lab7中修改：获取锁
   for (e = table[i]; e != 0; e = e->next) {
     if (e->key == key)
       break;
@@ -50,8 +55,12 @@ void put(int key, int value)
     // update the existing key.
     e->value = value;
   } else {
+    // 加锁
+    //pthread_mutex_lock(&locks[i]);
     // the new is new.
     insert(key, value, &table[i], table[i]);
+    // 释放锁
+    pthread_mutex_unlock(&locks[i]);
   }
 }
 
@@ -113,6 +122,11 @@ main(int argc, char *argv[])
   assert(NKEYS % nthread == 0);
   for (int i = 0; i < NKEYS; i++) {
     keys[i] = random();
+  }
+
+  // lab7中的修改：在main函数中初始化互斥锁数组
+  for(int i = 0; i < NBUCKET; ++i) {
+      pthread_mutex_init(&locks[i], NULL);
   }
 
   //
