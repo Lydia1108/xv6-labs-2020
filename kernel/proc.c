@@ -787,20 +787,20 @@ procdump(void)
 }
 
 // 遍历整个内核页表，将有效页表清空为0，如果不是最后一层，递归
-void
-proc_freekernelpt(pagetable_t kernelpt)
-{
-// similar to the freewalk method
-// there are 2^9 = 512 PTEs in a page table.
-  for(int i = 0; i < 512; i++){
-     pte_t pte = kernelpt[i];
-     if(pte & PTE_V){
-       kernelpt[i] = 0;
-       if ((pte & (PTE_R|PTE_W|PTE_X)) == 0){
-         uint64 child = PTE2PA(pte);
-         proc_freekernelpt((pagetable_t)child);
-       }
-    }
-  }
-   kfree((void*)kernelpt);
-}
+// void
+// proc_freekernelpt(pagetable_t kernelpt)
+// {
+//   // similar to the freewalk method
+//   // there are 2^9 = 512 PTEs in a page table.
+//   for(int i = 0; i < 512; i++){
+//     pte_t pte = kernelpt[i];
+//     if(pte & PTE_V){
+//       kernelpt[i] = 0;
+//       if ((pte & (PTE_R|PTE_W|PTE_X)) == 0){
+//         uint64 child = PTE2PA(pte);
+//         proc_freekernelpt((pagetable_t)child);
+//       }
+//     }
+//   }
+//   kfree((void*)kernelpt);
+// }
