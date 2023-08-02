@@ -15,6 +15,10 @@
 #include "sleeplock.h"
 #include "file.h"
 #include "fcntl.h"
+#include "memlayout.h"
+// 定义max和min宏定义
+#define max(a, b) ((a) > (b) ? (a) : (b))
+#define min(a, b) ((a) < (b) ? (a) : (b))
 
 // Fetch the nth word-sized system call argument as a file descriptor
 // and return both the descriptor and the corresponding struct file.
@@ -485,7 +489,8 @@ sys_pipe(void)
   return 0;
 }
 
-// lab10新增sys_mmap函数
+
+// lab10
 uint64 sys_mmap(void) {
   uint64 addr;
   int len, prot, flags, offset;
@@ -499,19 +504,20 @@ uint64 sys_mmap(void) {
       || argfd(4, 0, &f) < 0 || argint(5, &offset) < 0) {
     return -1;
   }
+  // 对参数进行简单检查
   if (flags != MAP_SHARED && flags != MAP_PRIVATE) {
     return -1;
   }
-  // the file must be written when flag is MAP_SHARED
+  // 映射的文件是不可写的且使用了PROT_WRITE，写映射权限会报错
   if (flags == MAP_SHARED && f->writable == 0 && (prot & PROT_WRITE)) {
     return -1;
   }
-  // offset must be a multiple of the page size
+  // 检查len和offset的非负性以及offset的整数倍性质
   if (len < 0 || offset < 0 || offset % PGSIZE) {
     return -1;
   }
 
-  // allocate a VMA for the mapped memory
+  //从当前进程的VMA数组中为该映射分配一个VMA结构
   for (i = 0; i < NVMA; ++i) {
     if (!p->vma[i].addr) {
       vma = &p->vma[i];
@@ -522,13 +528,11 @@ uint64 sys_mmap(void) {
     return -1;
   }
 
-  // assume that addr will always be 0, the kernel 
-  //choose the page-aligned address at which to create
-  //the mapping
+  // 将本次mmap的参数记录到分配的VMA中
   addr = MMAPMINADDR;
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr) {
-      // get the max address of the mapped memory  
+      // 遍历找到已被映射的最高地址
       addr = max(addr, p->vma[i].addr + p->vma[i].len);
     }
   }
@@ -542,13 +546,13 @@ uint64 sys_mmap(void) {
   vma->flags = flags;
   vma->offset = offset;
   vma->f = f;
-  filedup(f);     // increase the file's reference count
+  // 增加文件引用计数，防止被释放
+  filedup(f);
 
   return addr;
 }
 
-
-// lab10新增sys_munmap系统调用
+// 将映射的部分内存进行取消映射，若为MAP_SHARED则需要将对文件映射内存的修改会写到文件中
 uint64 sys_munmap(void) {
   uint64 addr, va;
   int len;
@@ -557,6 +561,7 @@ uint64 sys_munmap(void) {
   uint maxsz, n, n1;
   int i;
 
+  // 对参数进行检查
   if (argaddr(0, &addr) < 0 || argint(1, &len) < 0) {
     return -1;
   }
@@ -564,7 +569,7 @@ uint64 sys_munmap(void) {
     return -1;
   }
 
-  // find the VMA
+  // 根据addr和length找到对于的VMA结构体
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr && addr >= p->vma[i].addr
         && addr + len <= p->vma[i].addr + p->vma[i].len) {
@@ -572,6 +577,7 @@ uint64 sys_munmap(void) {
       break;
     }
   }
+  // 没找到则失败
   if (!vma) {
     return -1;
   }
@@ -579,15 +585,15 @@ uint64 sys_munmap(void) {
   if (len == 0) {
     return 0;
   }
-
+  // 判断当前取消映射的部分是否有MAP_SHARED标志位, 有的话则需要将该部分写回文件
   if ((vma->flags & MAP_SHARED)) {
-    // the max size once can write to the disk
+    // 一次可以写入磁盘的最大值
     maxsz = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
     for (va = addr; va < addr + len; va += PGSIZE) {
       if (uvmgetdirty(p->pagetable, va) == 0) {
         continue;
       }
-      // only write the dirty page back to the mapped file
+      // 判断哪些页面需要写入，仅写入脏页标志位记录过的
       n = min(PGSIZE, addr + len - va);
       for (i = 0; i < n; i += n1) {
         n1 = min(maxsz, n - i);
@@ -603,8 +609,9 @@ uint64 sys_munmap(void) {
       }
     }
   }
+  // 使用uvmunmap()将改部分页面在用户页表中取消映射.
   uvmunmap(p->pagetable, addr, (len - 1) / PGSIZE + 1, 1);
-  // update the vma
+  // 更新VMA
   if (addr == vma->addr && len == vma->len) {
     vma->addr = 0;
     vma->len = 0;

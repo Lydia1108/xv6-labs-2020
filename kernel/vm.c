@@ -172,11 +172,9 @@ uvmunmap(pagetable_t pagetable, uint64 va, uint64 npages, int do_free)
     if((pte = walk(pagetable, a, 0)) == 0)
       panic("uvmunmap: walk");
     if((*pte & PTE_V) == 0)
-      continue; //lab10中的改动
-      //panic("uvmunmap: not mapped");
+      continue;
     if(PTE_FLAGS(*pte) == PTE_V)
-      continue;//lab10中的改动
-      //panic("uvmunmap: not a leaf");
+      continue;
     if(do_free){
       uint64 pa = PTE2PA(*pte);
       kfree((void*)pa);
@@ -432,7 +430,7 @@ copyinstr(pagetable_t pagetable, char *dst, uint64 srcva, uint64 max)
   }
 }
 
-// get the dirty flag of the va's PTE - lab10
+// 用于读取脏页标志位
 int uvmgetdirty(pagetable_t pagetable, uint64 va) {
   pte_t *pte = walk(pagetable, va, 0);
   if(pte == 0) {
@@ -441,7 +439,7 @@ int uvmgetdirty(pagetable_t pagetable, uint64 va) {
   return (*pte & PTE_D);
 }
 
-// set the dirty flag and write flag of the va's PTE - lab10
+// 用于写入脏页标志位和写标志位
 int uvmsetdirtywrite(pagetable_t pagetable, uint64 va) {
   pte_t *pte = walk(pagetable, va, 0);
   if(pte == 0) {

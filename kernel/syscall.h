@@ -20,5 +20,6 @@
 #define SYS_link   19
 #define SYS_mkdir  20
 #define SYS_close  21
-#define SYS_mmap   22
-#define SYS_munmap 23
+
+#define SYS_mmap   27
+#define SYS_munmap 28

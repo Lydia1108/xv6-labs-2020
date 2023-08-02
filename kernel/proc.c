@@ -5,6 +5,13 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
+#include "fcntl.h"
+#include "sleeplock.h"
+#include "fs.h"
+#include "file.h"
+
+
+#define min(a, b) ((a) < (b) ? (a) : (b))
 
 struct cpu cpus[NCPU];
 
@@ -296,7 +303,7 @@ fork(void)
       np->ofile[i] = filedup(p->ofile[i]);
   np->cwd = idup(p->cwd);
 
-// copy all of VMA - lab10新增代码段
+  // 创建子进程时, 需要将父进程的 VMA 结构体进行拷贝
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr) {
       np->vma[i] = p->vma[i];
@@ -348,18 +355,23 @@ void
 exit(int status)
 {
   struct proc *p = myproc();
+  int i;
+  struct vm_area* vma;
+  uint maxsz = ((MAXOPBLOCKS - 1 - 1 - 2) / 2) * BSIZE;
+  uint64 va;
+  uint n, n1, r;
 
   if(p == initproc)
     panic("init exiting");
 
-
-// unmap the mapped memory - lab10新增的代码段
+  // 对文件映射部分内存进行取消映射
   for (i = 0; i < NVMA; ++i) {
     if (p->vma[i].addr == 0) {
       continue;
     }
     vma = &p->vma[i];
     if ((vma->flags & MAP_SHARED)) {
+      // 遍历VMA数组对所有文件映射内存进行取消映射
       for (va = vma->addr; va < vma->addr + vma->len; va += PGSIZE) {
         if (uvmgetdirty(p->pagetable, va) == 0) {
           continue;

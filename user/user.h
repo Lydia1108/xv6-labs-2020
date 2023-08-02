@@ -23,8 +23,10 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
-int sys_munmap(void);
-int sys_mmap(void);
+
+void *mmap(void *addr, uint length, int prot, int flags, int fd, uint offset);
+int munmap(void *addr, int length);
+
 
 
 // ulib.c
