@@ -1,6 +1,3 @@
-//lab10新增，用于表示 mmap 可以用于映射的最低地址
-#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)
-
 // Physical memory layout
 
 // qemu -machine virt is set up like this,
@@ -9,8 +6,8 @@
 // 00001000 -- boot ROM, provided by qemu
 // 02000000 -- CLINT
 // 0C000000 -- PLIC
-// 10000000 -- uart0 
-// 10001000 -- virtio disk 
+// 10000000 -- uart0
+// 10001000 -- virtio disk
 // 80000000 -- boot ROM jumps here in machine mode
 //             -kernel loads the kernel here
 // unused RAM after 80000000.
@@ -53,6 +50,8 @@
 // map the trampoline page to the highest address,
 // in both user and kernel space.
 #define TRAMPOLINE (MAXVA - PGSIZE)
+// the minimum address the mmap can ues - lab10
+#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)
 
 // map kernel stacks beneath the trampoline,
 // each surrounded by invalid guard pages.
@@ -68,5 +67,3 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
-
-#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)//lab10新增

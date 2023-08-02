@@ -5,10 +5,10 @@
 #include "spinlock.h"
 #include "proc.h"
 #include "defs.h"
-#include "sleeplock.h"
-#include "fs.h"
-#include "file.h"
-#include "fcntl.h"
+#include "sleeplock.h"  // lab10
+#include "fs.h"     // lab10
+#include "file.h"   // lab10
+#include "fcntl.h"  // lab10
 
 struct spinlock tickslock;
 uint ticks;
@@ -50,10 +50,10 @@ usertrap(void)
   w_stvec((uint64)kernelvec);
 
   struct proc *p = myproc();
-  
+
   // save user program counter.
   p->trapframe->epc = r_sepc();
-  
+
   if(r_scause() == 8){
     // system call
 
@@ -69,18 +69,18 @@ usertrap(void)
     intr_on();
 
     syscall();
-  } 
-  // 对访问文件映射内存产生的page fault进行处理
-  else if (r_scause() == 12 || r_scause() == 13
+  } else if (r_scause() == 12 || r_scause() == 13
              || r_scause() == 15) {
+    // mmap page fault - lab10
     char *pa;
     uint64 va = PGROUNDDOWN(r_stval());
     struct vm_area *vma = 0;
     int flags = PTE_U;
     int i;
-    // 根据发生page fault的地址去当前进程的VMA数组中找对应的VMA结构体
+    // find the VMA
     for (i = 0; i < NVMA; ++i) {
-      // 超过文件实际大小的部分, 内容都会是 0, 可以访问修改, 但最后都不会写回文件中.
+      // like the Linux mmap, it can modify the remaining bytes in
+      //the end of mapped page
       if (p->vma[i].addr && va >= p->vma[i].addr
           && va < p->vma[i].addr + p->vma[i].len) {
         vma = &p->vma[i];
@@ -90,37 +90,35 @@ usertrap(void)
     if (!vma) {
       goto err;
     }
-    // 找到对应的VMA则表明本次page fault是由于访问文件映射的内存产生的，继续执行后续操作
+    // set write flag and dirty flag to the mapped page's PTE
     if (r_scause() == 15 && (vma->prot & PROT_WRITE)
         && walkaddr(p->pagetable, va)) {
       if (uvmsetdirtywrite(p->pagetable, va)) {
         goto err;
       }
     } else {
-      // Lazy allocation, 使用kalloc先分配一个物理页, 并使用memset进行清空
       if ((pa = kalloc()) == 0) {
         goto err;
       }
       memset(pa, 0, PGSIZE);
       ilock(vma->f->ip);
-      // 使用readi()根据发生page fault的地址从文件的相应部分读取内容到分配的物理页
       if (readi(vma->f->ip, 0, (uint64) pa, va - vma->addr + vma->offset, PGSIZE) < 0) {
         iunlock(vma->f->ip);
         goto err;
       }
-      // 设置访问权限
       iunlock(vma->f->ip);
       if ((vma->prot & PROT_READ)) {
         flags |= PTE_R;
       }
-      // 对于写权限此处只有本次是 Store Page fault 时才会设置
+      // only store page fault and the mapped page can be written
+      //set the PTE write flag and dirty flag otherwise don't set
+      //these two flag until next store page falut
       if (r_scause() == 15 && (vma->prot & PROT_WRITE)) {
         flags |= PTE_W | PTE_D;
       }
       if ((vma->prot & PROT_EXEC)) {
         flags |= PTE_X;
       }
-      // 使用mappages()将物理页映射到用户进程的页面值
       if (mappages(p->pagetable, va, PGSIZE, (uint64) pa, flags) != 0) {
         kfree(pa);
         goto err;
@@ -170,7 +168,7 @@ usertrapret(void)
 
   // set up the registers that trampoline.S's sret will use
   // to get to user space.
-  
+
   // set S Previous Privilege mode to User.
   unsigned long x = r_sstatus();
   x &= ~SSTATUS_SPP; // clear SPP to 0 for user mode
@@ -183,7 +181,7 @@ usertrapret(void)
   // tell trampoline.S the user page table to switch to.
   uint64 satp = MAKE_SATP(p->pagetable);
 
-  // jump to trampoline.S at the top of memory, which 
+  // jump to trampoline.S at the top of memory, which
   // switches to the user page table, restores user registers,
   // and switches to user mode with sret.
   uint64 fn = TRAMPOLINE + (userret - trampoline);
@@ -192,14 +190,14 @@ usertrapret(void)
 
 // interrupts and exceptions from kernel code go here via kernelvec,
 // on whatever the current kernel stack is.
-void 
+void
 kerneltrap()
 {
   int which_dev = 0;
   uint64 sepc = r_sepc();
   uint64 sstatus = r_sstatus();
   uint64 scause = r_scause();
-  
+
   if((sstatus & SSTATUS_SPP) == 0)
     panic("kerneltrap: not from supervisor mode");
   if(intr_get() != 0)
@@ -269,7 +267,7 @@ devintr()
     if(cpuid() == 0){
       clockintr();
     }
-    
+
     // acknowledge the software interrupt by clearing
     // the SSIP bit in sip.
     w_sip(r_sip() & ~2);
