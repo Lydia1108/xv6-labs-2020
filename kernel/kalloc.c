@@ -36,6 +36,7 @@ kinit()
   }
   freerange(end, (void*)PHYSTOP);
 }
+
 void
 freerange(void *pa_start, void *pa_end)
 {
