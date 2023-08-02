@@ -68,3 +68,5 @@
 //   TRAPFRAME (p->trapframe, used by the trampoline)
 //   TRAMPOLINE (the same page as in the kernel)
 #define TRAPFRAME (TRAMPOLINE - PGSIZE)
+
+#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)//lab10新增
