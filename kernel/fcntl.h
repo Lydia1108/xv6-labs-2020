@@ -4,4 +4,4 @@
 #define O_CREATE  0x200
 #define O_TRUNC   0x400
 // 新的文件标志位
-#define O_NOFOLLOW 0x004
+#define O_NOFOLLOW 0x010

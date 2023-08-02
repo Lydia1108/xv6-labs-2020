@@ -362,12 +362,37 @@ sys_open(void)
   }
 
   // 对符号链接文件进行额外处理
-  if(ip->type == T_SYMLINK && (omode & O_NOFOLLOW) == 0) {
-    if((ip = follow_symlink(ip)) == 0) {
-      // 此处不用调用iunlockput()释放锁,因为在follow_symlinktest()返回失败时ip的锁在函数内已经被释放
-      end_op();
-      return -1;
-    }
+  if(ip->type == T_SYMLINK ) {
+    if ((omode & O_NOFOLLOW) == 0){
+	        char target[MAXPATH];
+	        int recursive_depth = 0;
+	        while (1)
+	        {
+	            if (recursive_depth >= 10)
+	            {
+	                iunlockput(ip);
+	                end_op();
+	                return -1;
+	            }
+	            if (readi(ip, 0, (uint64)target, ip->size-MAXPATH, MAXPATH) != MAXPATH)
+	            {
+	                return -1;
+	            }
+	            iunlockput(ip);
+	            if ((ip = namei(target)) == 0)
+	            {
+	                end_op();
+	                return -1;
+	            }
+	            ilock(ip);
+	            if (ip->type != T_SYMLINK)
+	            {
+	                break;
+	            }
+	            recursive_depth++;
+	        }
+	    }
+    
   }
 
   if((f = filealloc()) == 0 || (fd = fdalloc(f)) < 0){
@@ -533,31 +558,34 @@ sys_pipe(void)
   return 0;
 }
 
-// 用来生成符号链接，存储目标文件的路径
-uint64 sys_symlink(void) {
-  char target[MAXPATH], path[MAXPATH];
-  struct inode *ip;
-  int n;
+// lab 9-2 用来生成符号链接，存储目标文件的路径
+uint64 sys_symlink(void)
+{
+    char target[MAXPATH], path[MAXPATH];
+    struct inode *ip;
 
-  if ((n = argstr(0, target, MAXPATH)) < 0
-    || argstr(1, path, MAXPATH) < 0) {
-    return -1;
-  }
+    if (argstr(0, target, MAXPATH) < 0 || argstr(1, path, MAXPATH) < 0)
+    {
+        return -1;
+    }
 
-  begin_op();
-  // 创建符号链接路径对应的inode结构
-  if((ip = create(path, T_SYMLINK, 0, 0)) == 0) {
-    end_op();
-    return -1;
-  }
-  // 将链接的目标文件的路径写入inode中
-  if(writei(ip, 0, (uint64)target, 0, n) != n) {
+    begin_op();
+
+    if ((ip = namei(path)) == 0)
+    {
+        ip = create(path, T_SYMLINK, 0, 0);
+        iunlock(ip);
+    }
+
+    ilock(ip);
+
+    if (writei(ip, 0, (uint64)target, ip->size, MAXPATH) != MAXPATH)
+    {
+        return -1;
+    }
+    
     iunlockput(ip);
     end_op();
-    return -1;
-  }
-
-  iunlockput(ip);
-  end_op();
-  return 0;
+    
+    return 0;
 }
