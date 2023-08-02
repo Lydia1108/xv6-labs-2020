@@ -401,16 +401,16 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
-  // 添加对第 NDIRECT 13个块的二级间接索引的处理代码，方法与上文类似，不过要索引两次
+  // doubly-indirect block - lab9-1
   bn -= NINDIRECT;
   if(bn < NDOUBLYINDIRECT) {
-    // 获得二级简介索引块的地址
+    // get the address of doubly-indirect block
     if((addr = ip->addrs[NDIRECT + 1]) == 0) {
       ip->addrs[NDIRECT + 1] = addr = balloc(ip->dev);
     }
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
-    // 获得一级简介索引块的地址
+    // get the address of singly-indirect block
     if((addr = a[bn / NINDIRECT]) == 0) {
       a[bn / NINDIRECT] = addr = balloc(ip->dev);
       log_write(bp);
@@ -419,7 +419,7 @@ bmap(struct inode *ip, uint bn)
     bp = bread(ip->dev, addr);
     a = (uint*)bp->data;
     bn %= NINDIRECT;
-    // 获取直接块的地址
+    // get the address of direct block
     if((addr = a[bn]) == 0) {
       a[bn] = addr = balloc(ip->dev);
       log_write(bp);
@@ -436,9 +436,9 @@ bmap(struct inode *ip, uint bn)
 void
 itrunc(struct inode *ip)
 {
-  int i, j, k;
-  struct buf *bp, *bp2;
-  uint *a, *a2;
+  int i, j, k;  // lab9-1
+  struct buf *bp, *bp2;     // lab9-1
+  uint *a, *a2; // lab9-1
 
   for(i = 0; i < NDIRECT; i++){
     if(ip->addrs[i]){
@@ -458,8 +458,7 @@ itrunc(struct inode *ip)
     bfree(ip->dev, ip->addrs[NDIRECT]);
     ip->addrs[NDIRECT] = 0;
   }
-
-  // 释放两级索引表示的块，多一层循环
+  // free the doubly-indirect block - lab9-1
   if(ip->addrs[NDIRECT + 1]) {
     bp = bread(ip->dev, ip->addrs[NDIRECT + 1]);
     a = (uint*)bp->data;
@@ -485,7 +484,6 @@ itrunc(struct inode *ip)
   ip->size = 0;
   iupdate(ip);
 }
-
 // Copy stat information from inode.
 // Caller must hold ip->lock.
 void

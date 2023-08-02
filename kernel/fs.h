@@ -4,12 +4,9 @@
 
 #define ROOTINO  1   // root i-number
 #define BSIZE 1024  // block size
-// 二级间接块号的总数
-#define NDOUBLYINDIRECT (NINDIRECT * NINDIRECT)
-// 文件最大大小的宏定义
-#define MAXFILE (NDIRECT + NINDIRECT + NDOUBLYINDIRECT)
-// 最大的符号链接深度
-#define NSYMLINK 10
+#define NDOUBLYINDIRECT (NINDIRECT * NINDIRECT)// lab9-1 二级间接块号的总数
+#define MAXFILE (NDIRECT + NINDIRECT + NDOUBLYINDIRECT)// 文件最大大小的宏定义
+#define NSYMLINK 10// 最大的符号链接深度
 
 // Disk layout:
 // [ boot block | super block | log | inode blocks |
@@ -30,7 +27,8 @@ struct superblock {
 
 #define FSMAGIC 0x10203040
 
-#define NDIRECT 11
+
+#define NDIRECT 11// lab9-1中的修改
 #define NINDIRECT (BSIZE / sizeof(uint))
 
 // On-disk inode structure
@@ -40,7 +38,7 @@ struct dinode {
   short minor;          // Minor device number (T_DEVICE only)
   short nlink;          // Number of links to inode in file system
   uint size;            // Size of file (bytes)
-  uint addrs[NDIRECT+2];   // Data block addresses
+  uint addrs[NDIRECT+2];   // Data block addresses  // lab9-1
 };
 
 // Inodes per block.
