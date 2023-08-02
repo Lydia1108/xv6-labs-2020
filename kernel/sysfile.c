@@ -283,44 +283,7 @@ create(char *path, short type, short major, short minor)
   return ip;
 }
 
-// 用来寻找符号链接的目标文件
-static struct inode* follow_symlink(struct inode* ip) {
-  uint inums[NSYMLINK];
-  int i, j;
-  char target[MAXPATH];
 
-  for(i = 0; i < NSYMLINK; ++i) {
-    inums[i] = ip->inum;
-    // 读到符号链接的目标
-    if(readi(ip, 0, (uint64)target, 0, MAXPATH) <= 0) {
-      iunlockput(ip);
-      printf("open_symlink: open symlink failed\n");
-      return 0;
-    }
-    iunlockput(ip);
-    
-    // 链接深度限制
-    if((ip = namei(target)) == 0) {
-      printf("open_symlink: path \"%s\" is not exist\n", target);
-      return 0;
-    }
-    // 成环检测
-    for(j = 0; j <= i; ++j) {
-      if(ip->inum == inums[j]) {
-        printf("open_symlink: links form a cycle\n");
-        return 0;
-      }
-    }
-    ilock(ip);
-    if(ip->type != T_SYMLINK) {
-      return ip;
-    }
-  }
-
-  iunlockput(ip);
-  printf("open_symlink: the depth of links reaches the limit\n");
-  return 0;
-}
 
 uint64
 sys_open(void)
