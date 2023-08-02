@@ -29,134 +29,132 @@
 extern uint ticks;
 
 struct {
-  struct spinlock lock;
-  struct buf buf[NBUF];
-  // 记录已经分配到哈希表的缓存块 struct buf 的数量
-  int size;
-  // 哈希表的 bucket 数组
-  struct buf buckets[NBUCKET];
-  // 作为每个 bucket 对应的锁
-  struct spinlock locks[NBUCKET];
-  // 哈希表的全局锁, 用于对哈希表整体加锁
-  struct spinlock hashlock;
-
-  // Linked list of all buffers, through prev/next.
-  // Sorted by how recently the buffer was used.
-  // head.next is most recent, head.prev is least.
-  // 去除head
-  // struct buf head;
+	struct spinlock lock[NBUCKET];
+	struct buf buf[NBUF];
+	struct buf head[NBUCKET];
 } bcache;
 
 void
 binit(void)
 {
-  int i;
   struct buf *b;
 
-  bcache.size = 0;
-  initlock(&bcache.lock, "bcache");
-  // 初始化哈希锁
-  initlock(&bcache.hashlock, "bcache_hash");
-  for(i = 0; i < NBUCKET; ++i) {
-    initlock(&bcache.locks[i], "bcache_bucket");
+  for (int i=0;i<NBUCKET;i++)
+  {
+    initlock(&bcache.lock[i], "bcache");
   }
-
-  for(b = bcache.buf; b < bcache.buf+NBUF; b++){
+  // Create linked list of buffers
+  // bcache.head[0].prev = &bcache.head[0];
+  bcache.head[0].next = &bcache.buf[0];
+  for(b = bcache.buf; b < bcache.buf+NBUF-1; b++){
+    b->next = b+1;
     initsleeplock(&b->lock, "buffer");
   }
+  initsleeplock(&b->lock, "buffer");
 }
 
-// Look through buffer cache for block on device dev.
-// If not found, allocate a buffer.
-// In either case, return locked buffer.
+void
+write_cache(struct buf *take_buf, uint dev, uint blockno)
+{
+  take_buf->dev = dev;
+  take_buf->blockno = blockno;
+  take_buf->valid = 0;
+  take_buf->refcnt = 1;
+  take_buf->time = ticks;
+}
+
 static struct buf*
 bget(uint dev, uint blockno)
 {
-  struct buf *b;
-  // 定义一些变量
-  int idx = HASH(blockno);
-  struct buf *pre, *minb = 0, *minpre;
-  uint mintimestamp;
-  int i;
+  struct buf *b, *last;
+  struct buf *take_buf = 0;
+  int id = HASH(blockno);
+  acquire(&(bcache.lock[id]));
 
-  // 在buckets[idx]里循环buf
-  acquire(&bcache.locks[idx]);
-  for(b = bcache.buckets[idx].next; b; b = b->next){
-    if(b->dev == dev && b->blockno == blockno){
+  // 在本池子中寻找是否已缓存，同时寻找空闲块，并记录链表最后一个节点便于待会插入新节点使用
+  b = bcache.head[id].next;
+  last = &(bcache.head[id]);
+  for(; b; b = b->next, last = last->next)
+  {
+
+    if(b->dev == dev && b->blockno == blockno)
+    {
+      b->time = ticks;
       b->refcnt++;
-      release(&bcache.locks[idx]);
+      release(&(bcache.lock[id]));
       acquiresleep(&b->lock);
       return b;
     }
+    if(b->refcnt == 0)
+    {
+      take_buf = b;
+    }
   }
 
-  // Not cached.
-  // check if there is a buf not used -lab8-2
-  acquire(&bcache.lock);
-  if(bcache.size < NBUF) {
-    b = &bcache.buf[bcache.size++];
-    release(&bcache.lock);
-    b->dev = dev;
-    b->blockno = blockno;
-    b->valid = 0;
-    b->refcnt = 1;
-    b->next = bcache.buckets[idx].next;
-    bcache.buckets[idx].next = b;
-    release(&bcache.locks[idx]);
-    acquiresleep(&b->lock);
-    return b;
+  //如果没缓存并且在本池子有空闲块，则使用它
+  if(take_buf)
+  {
+    write_cache(take_buf, dev, blockno);
+    release(&(bcache.lock[id]));
+    acquiresleep(&(take_buf->lock));
+    return take_buf;
   }
-  release(&bcache.lock);
-  release(&bcache.locks[idx]);
 
-  // select the last-recently used block int the bucket
-  //based on the timestamp - lab8-2
-  acquire(&bcache.hashlock);
-  for(i = 0; i < NBUCKET; ++i) {
-      mintimestamp = -1;
-      acquire(&bcache.locks[idx]);
-      for(pre = &bcache.buckets[idx], b = pre->next; b; pre = b, b = b->next) {
-          // research the block
-          if(idx == HASH(blockno) && b->dev == dev && b->blockno == blockno){
-              b->refcnt++;
-              release(&bcache.locks[idx]);
-              release(&bcache.hashlock);
-              acquiresleep(&b->lock);
-              return b;
-          }
-          if(b->refcnt == 0 && b->timestamp < mintimestamp) {
-              minb = b;
-              minpre = pre;
-              mintimestamp = b->timestamp;
-          }
+  // 到其他池子寻找最久未使用的空闲块
+  int lock_num = -1;
+
+  uint64 time = __UINT64_MAX__;
+  struct buf *tmp;
+  struct buf *last_take = 0;
+  for(int i = 0; i < NBUCKET; ++i)
+  {
+
+    if(i == id) continue;
+    //获取寻找池子的锁
+    acquire(&(bcache.lock[i]));
+
+    for(b = bcache.head[i].next, tmp = &(bcache.head[i]); b; b = b->next,tmp = tmp->next)
+    {
+      if(b->refcnt == 0)
+      {
+        //找到符合要求的块
+        if(b->time < time)
+        {
+
+          time = b->time;
+          last_take = tmp;
+          take_buf = b;
+          //如果上一个空闲块不在本轮池子中，则释放那个空闲块的锁
+          if(lock_num != -1 && lock_num != i && holding(&(bcache.lock[lock_num])))
+            release(&(bcache.lock[lock_num]));
+          lock_num = i;
+        }
       }
-      // find an unused block
-      if(minb) {
-          minb->dev = dev;
-          minb->blockno = blockno;
-          minb->valid = 0;
-          minb->refcnt = 1;
-          // if block in another bucket, we should move it to correct bucket
-          if(idx != HASH(blockno)) {
-              minpre->next = minb->next;    // remove block
-              release(&bcache.locks[idx]);
-              idx = HASH(blockno);  // the correct bucket index
-              acquire(&bcache.locks[idx]);
-              minb->next = bcache.buckets[idx].next;    // move block to correct bucket
-              bcache.buckets[idx].next = minb;
-          }
-          release(&bcache.locks[idx]);
-          release(&bcache.hashlock);
-          acquiresleep(&minb->lock);
-          return minb;
-      }
-      release(&bcache.locks[idx]);
-      if(++idx == NBUCKET) {
-          idx = 0;
-      }
+    }
+    //没有用到本轮池子的块，则释放锁
+    if(lock_num != i)
+      release(&(bcache.lock[i]));
   }
-  panic("bget: no buffers");
+
+  if (!take_buf)
+    panic("bget: no buffers");
+
+  //将选中块从其他池子中拿出
+  last_take->next = take_buf->next;
+  take_buf->next = 0;
+  release(&(bcache.lock[lock_num]));
+  //将选中块放入本池子中，并写cache
+  b = last;
+  b->next = take_buf;
+  write_cache(take_buf, dev, blockno);
+
+
+  release(&(bcache.lock[id]));
+  acquiresleep(&(take_buf->lock));
+
+  return take_buf;
 }
+
 
 // Return a locked buf with the contents of the indicated block.
 struct buf*
@@ -186,38 +184,28 @@ bwrite(struct buf *b)
 void
 brelse(struct buf *b)
 {
-  int idx;
   if(!holdingsleep(&b->lock))
     panic("brelse");
 
   releasesleep(&b->lock);
 
-  // 改变锁
-  idx = HASH(b->blockno);
-  acquire(&bcache.locks[idx]);
+  int h = HASH(b->blockno);
+  acquire(&bcache.lock[h]);
   b->refcnt--;
-  if (b->refcnt == 0) {
-    // 改变时间戳记录的缓存块
-    b->timestamp = ticks;
-  }
-  
-  release(&bcache.locks[idx]);
+  release(&bcache.lock[h]);
 }
 
-void
-bpin(struct buf *b) {
-  // 改变锁，将原本的全局锁替换为缓存块对应的 bucket 的锁
-  int idx = HASH(b->blockno);
-  acquire(&bcache.locks[idx]);
+void bpin(struct buf *b)
+{
+  int bucket_id = b->blockno % NBUCKET;
+  acquire(&bcache.lock[bucket_id]);
   b->refcnt++;
-  release(&bcache.locks[idx]);
+  release(&bcache.lock[bucket_id]);
 }
-
-void
-bunpin(struct buf *b) {
-  // 改变锁，将原本的全局锁替换为缓存块对应的 bucket 的锁
-  int idx = HASH(b->blockno);
-  acquire(&bcache.locks[idx]);
+void bunpin(struct buf *b)
+{
+  int bucket_id = b->blockno % NBUCKET;
+  acquire(&bcache.lock[bucket_id]);
   b->refcnt--;
-  release(&bcache.locks[idx]);
+  release(&bcache.lock[bucket_id]);
 }
