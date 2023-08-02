@@ -25,7 +25,7 @@
 
 // 哈希表bucket的数目
 #define NBUCKET 13
-#define HASH(blockno) (blockno % NBUCKET)
+//#define HASH(blockno) (blockno % NBUCKET)
 extern uint ticks;
 
 struct {
