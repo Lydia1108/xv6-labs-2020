@@ -1,3 +1,6 @@
+//lab10新增，用于表示 mmap 可以用于映射的最低地址
+#define MMAPMINADDR (TRAPFRAME - 10 * PGSIZE)
+
 // Physical memory layout
 
 // qemu -machine virt is set up like this,
