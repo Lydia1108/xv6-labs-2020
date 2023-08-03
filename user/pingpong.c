@@ -9,7 +9,6 @@ int main(int argc, char const *argv[]) {
     pipe(father_to_child);
     int pid = fork();//建立子进程
     int exit_status = 0;
-
     if (pid < 0) {//出错
         printf("error!\n");
         close(child_to_father[0]);
