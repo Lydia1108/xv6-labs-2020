@@ -14,7 +14,7 @@ sub entry {
     print " ecall\n";
     print " ret\n";
 }
-	
+
 entry("fork");
 entry("exit");
 entry("wait");
@@ -36,5 +36,5 @@ entry("getpid");
 entry("sbrk");
 entry("sleep");
 entry("uptime");
-entry("mmap");
-entry("sys_munmap");
+entry("mmap");      # lab10新增
+entry("munmap");    # lab10新增
