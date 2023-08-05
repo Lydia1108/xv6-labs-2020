@@ -324,12 +324,7 @@ uvmcopy(pagetable_t old, pagetable_t new, uint64 sz)
     flags = (PTE_FLAGS(*pte) & (~PTE_W)) | PTE_COW;
     *pte = PA2PTE(pa) | flags;
 
-    // flags = PTE_FLAGS(*pte);
-    // 不再申请新的页表
-    // if((mem = kalloc()) == 0)
-    //   goto err;
-    // memmove(mem, (char*)pa, PGSIZE);
-
+    
     // 这里使用老的pa替换mem
     if(mappages(new, i, PGSIZE, pa, flags) != 0){
       // kfree(mem);
