@@ -1,8 +1,9 @@
-	# qemu -kernel loads the kernel at 0x80000000
+		# qemu -kernel loads the kernel at 0x80000000
         # and causes each CPU to jump there.
         # kernel.ld causes the following code to
         # be placed at 0x80000000.
 .section .text
+.global _entry
 _entry:
 	# set up a stack for C.
         # stack0 is declared in start.c,
