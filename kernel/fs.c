@@ -401,7 +401,7 @@ bmap(struct inode *ip, uint bn)
     return addr;
   }
 
-  // doubly-indirect block - lab9-1
+  // doubly-indirect block - lab9-1中修改
   bn -= NINDIRECT;
   if(bn < NDOUBLYINDIRECT) {
     // get the address of doubly-indirect block

@@ -531,24 +531,18 @@ uint64 sys_symlink(void)
     {
         return -1;
     }
-
     begin_op();
-
     if ((ip = namei(path)) == 0)
     {
         ip = create(path, T_SYMLINK, 0, 0);
         iunlock(ip);
     }
-
     ilock(ip);
-
     if (writei(ip, 0, (uint64)target, ip->size, MAXPATH) != MAXPATH)
     {
         return -1;
     }
-    
     iunlockput(ip);
     end_op();
-    
     return 0;
 }
