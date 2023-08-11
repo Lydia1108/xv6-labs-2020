@@ -551,7 +551,7 @@ uint64 sys_mmap(void) {
   return addr;
 }
 
-// lab10
+// lab10新增
 uint64 sys_munmap(void) {
   uint64 addr, va;
   int len;
